@@ -26,7 +26,7 @@ namespace CudaRasterizer
 		chunk = reinterpret_cast<char*>(ptr + count);
 	}
 
-	struct GeometryState
+	struct GeometryState //[Yutong] Each gaussian has a geometryState
 	{
 		size_t scan_size;
 		float* depths;
@@ -34,7 +34,7 @@ namespace CudaRasterizer
 		bool* clamped;
 		int* internal_radii;
 		float2* means2D;
-		float* cov3D;
+		float* cov3D; // 3D covariance
 		float4* conic_opacity;
 		float* rgb;
 		uint32_t* point_offsets;
@@ -43,16 +43,16 @@ namespace CudaRasterizer
 		static GeometryState fromChunk(char*& chunk, size_t P);
 	};
 
-	struct ImageState
+	struct ImageState // Each pixel has an ImageState
 	{
-		uint2* ranges;
-		uint32_t* n_contrib;
-		float* accum_alpha;
+		uint2* ranges; // pointer to an array of uint2 elements
+		uint32_t* n_contrib; // number of contributions to each pixels
+		float* accum_alpha; //
 
 		static ImageState fromChunk(char*& chunk, size_t N);
 	};
 
-	struct BinningState
+	struct BinningState // Total number of gaussian instantiations (after duplication)
 	{
 		size_t sorting_size;
 		uint64_t* point_list_keys_unsorted;

@@ -45,8 +45,9 @@ __forceinline__ __device__ float ndc2Pix(float v, int S)
 
 __forceinline__ __device__ void getRect(const float2 p, int max_radius, uint2& rect_min, uint2& rect_max, dim3 grid)
 {
+    // [Yutong] Which block the left / top drop in. Clip to [0, num_block]
 	rect_min = {
-		min(grid.x, max((int)0, (int)((p.x - max_radius) / BLOCK_X))),
+		min(grid.x, max((int)0, (int)((p.x - max_radius) / BLOCK_X))),  
 		min(grid.y, max((int)0, (int)((p.y - max_radius) / BLOCK_Y)))
 	};
 	rect_max = {

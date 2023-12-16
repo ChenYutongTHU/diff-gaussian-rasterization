@@ -457,7 +457,7 @@ renderCUDA(
 
 	// Gradient of pixel coordinate w.r.t. normalized 
 	// screen-space viewport corrdinates (-1 to 1)
-	const float ddelx_dx = 0.5 * W;
+	const float ddelx_dx = 0.5 * W; //delx = (x+1)/2*W
 	const float ddely_dy = 0.5 * H;
 
 	// Traverse all Gaussians
@@ -531,18 +531,19 @@ renderCUDA(
 			float bg_dot_dpixel = 0;
 			for (int i = 0; i < C; i++)
 				bg_dot_dpixel += bg_color[i] * dL_dpixel[i];
-			dL_dalpha += (-T_final / (1.f - alpha)) * bg_dot_dpixel;
+			dL_dalpha += (-T_final / (1.f - alpha)) * bg_dot_dpixel; 
+            
 
 
 			// Helpful reusable temporary variables
-			const float dL_dG = con_o.w * dL_dalpha;
-			const float gdx = G * d.x;
+			const float dL_dG = con_o.w * dL_dalpha; //alpha = min(0.99f, con_o.w * G);
+			const float gdx = G * d.x; 
 			const float gdy = G * d.y;
-			const float dG_ddelx = -gdx * con_o.x - gdy * con_o.y;
+			const float dG_ddelx = -gdx * con_o.x - gdy * con_o.y; //[Yutong] delx-> x in the 2D-pixel space
 			const float dG_ddely = -gdy * con_o.z - gdx * con_o.y;
 
 			// Update gradients w.r.t. 2D mean position of the Gaussian
-			atomicAdd(&dL_dmean2D[global_id].x, dL_dG * dG_ddelx * ddelx_dx);
+			atomicAdd(&dL_dmean2D[global_id].x, dL_dG * dG_ddelx * ddelx_dx); // x-> NDC space
 			atomicAdd(&dL_dmean2D[global_id].y, dL_dG * dG_ddely * ddely_dy);
 
 			// Update gradients w.r.t. 2D covariance (2x2 matrix, symmetric)

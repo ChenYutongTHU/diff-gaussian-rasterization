@@ -230,11 +230,12 @@ int CudaRasterizer::Rasterizer::forward(
 	{
 		radii = geomState.internal_radii;
 	}
-
-	dim3 tile_grid((width + BLOCK_X - 1) / BLOCK_X, (height + BLOCK_Y - 1) / BLOCK_Y, 1);
-	dim3 block(BLOCK_X, BLOCK_Y, 1);
+    // [Yutong]tile_grid the number of block or tiles
+	dim3 tile_grid((width + BLOCK_X - 1) / BLOCK_X, (height + BLOCK_Y - 1) / BLOCK_Y, 1); //Ceiling
+	dim3 block(BLOCK_X, BLOCK_Y, 1); // (16,16,1)
 
 	// Dynamically resize image-based auxiliary buffers during training
+    // [GPT]Calculating the size (in bytes) needed for allocating an image-based auxiliary buffer. Let me break it down:
 	size_t img_chunk_size = required<ImageState>(width * height);
 	char* img_chunkptr = imageBuffer(img_chunk_size);
 	ImageState imgState = ImageState::fromChunk(img_chunkptr, width * height);
@@ -272,7 +273,7 @@ int CudaRasterizer::Rasterizer::forward(
 		prefiltered
 	), debug)
 
-	// Compute prefix sum over full list of touched tile counts by Gaussians
+	// Compute prefix sum over full list of touched tile counts by Gaussians // [Yutong] offset
 	// E.g., [2, 3, 0, 2, 1] -> [2, 5, 5, 7, 8]
 	CHECK_CUDA(cub::DeviceScan::InclusiveSum(geomState.scanning_space, geomState.scan_size, geomState.tiles_touched, geomState.point_offsets, P), debug)
 
@@ -286,13 +287,14 @@ int CudaRasterizer::Rasterizer::forward(
 
 	// For each instance to be rendered, produce adequate [ tile | depth ] key 
 	// and corresponding dublicated Gaussian indices to be sorted
+    // [Yutong] A CUDA kernel function configured by blocks wth 256 threads each
 	duplicateWithKeys << <(P + 255) / 256, 256 >> > (
 		P,
 		geomState.means2D,
 		geomState.depths,
 		geomState.point_offsets,
-		binningState.point_list_keys_unsorted,
-		binningState.point_list_unsorted,
+		binningState.point_list_keys_unsorted, //[Yutong] [Tileid|depth]
+		binningState.point_list_unsorted, // [Yutong] Value is the gaussian ID, so binning is the group of duplicated Gaussians
 		radii,
 		tile_grid)
 	CHECK_CUDA(, debug)

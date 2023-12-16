@@ -28,7 +28,7 @@ def rasterize_gaussians(
     rotations,
     cov3Ds_precomp,
     raster_settings,
-):
+):  
     return _RasterizeGaussians.apply(
         means3D,
         means2D,
@@ -59,7 +59,7 @@ class _RasterizeGaussians(torch.autograd.Function):
         # Restructure arguments the way that the C++ lib expects them
         args = (
             raster_settings.bg, 
-            means3D,
+            means3D, #tensor require_grad()
             colors_precomp,
             opacities,
             scales,
@@ -72,15 +72,16 @@ class _RasterizeGaussians(torch.autograd.Function):
             raster_settings.tanfovy,
             raster_settings.image_height,
             raster_settings.image_width,
-            sh,
-            raster_settings.sh_degree,
+            sh, 
+            raster_settings.sh_degree, 
             raster_settings.campos,
             raster_settings.prefiltered,
             raster_settings.debug
         )
 
         # Invoke C++/CUDA rasterizer
-        if raster_settings.debug:
+        # import ipdb; ipdb.set_trace() (We cannot debug here)
+        if raster_settings.debug: #False
             cpu_args = cpu_deep_copy_tuple(args) # Copy them before they can be corrupted
             try:
                 num_rendered, color, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
@@ -142,14 +143,14 @@ class _RasterizeGaussians(torch.autograd.Function):
 
         grads = (
             grad_means3D,
-            grad_means2D,
+            grad_means2D, #?
             grad_sh,
-            grad_colors_precomp,
+            grad_colors_precomp, #? It also has gradients?
             grad_opacities,
             grad_scales,
             grad_rotations,
-            grad_cov3Ds_precomp,
-            None,
+            grad_cov3Ds_precomp, #?
+            None, #rasterizer_setting does not need gradients
         )
 
         return grads
@@ -185,9 +186,8 @@ class GaussianRasterizer(nn.Module):
         return visible
 
     def forward(self, means3D, means2D, opacities, shs = None, colors_precomp = None, scales = None, rotations = None, cov3D_precomp = None):
-        
-        raster_settings = self.raster_settings
 
+        raster_settings = self.raster_settings
         if (shs is None and colors_precomp is None) or (shs is not None and colors_precomp is not None):
             raise Exception('Please provide excatly one of either SHs or precomputed colors!')
         
@@ -211,7 +211,7 @@ class GaussianRasterizer(nn.Module):
             means3D,
             means2D,
             shs,
-            colors_precomp,
+            colors_precomp, #([])
             opacities,
             scales, 
             rotations,
