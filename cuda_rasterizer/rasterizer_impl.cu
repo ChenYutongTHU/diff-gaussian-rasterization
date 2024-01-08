@@ -161,8 +161,10 @@ CudaRasterizer::GeometryState CudaRasterizer::GeometryState::fromChunk(char*& ch
 	obtain(chunk, geom.means2D, P, 128);
 	obtain(chunk, geom.cov3D, P * 6, 128);
 	obtain(chunk, geom.conic_opacity, P, 128);
-	obtain(chunk, geom.rgb, P * 3, 128);
-	obtain(chunk, geom.tiles_touched, P, 128);
+    obtain(chunk, geom.cov2D, P, 128);
+    obtain(chunk, geom.cov2D_wofilter, P, 128);
+    obtain(chunk, geom.rgb, P * 3, 128);
+    obtain(chunk, geom.tiles_touched, P, 128);
 	cub::DeviceScan::InclusiveSum(nullptr, geom.scan_size, geom.tiles_touched, geom.tiles_touched, P);
 	obtain(chunk, geom.scanning_space, geom.scan_size, 128);
 	obtain(chunk, geom.point_offsets, P, 128);
@@ -215,9 +217,12 @@ int CudaRasterizer::Rasterizer::forward(
 	const float* cam_pos,
 	const float tan_fovx, float tan_fovy,
 	const bool prefiltered,
-	float* out_color,
-	int* radii,
-	bool debug)
+	float* out_color, int* out_num_gs, float* out_gss,
+	int* radii, int* radii_min,
+	int* radiiBeforeFilter, int* radii_minBeforeFilter,
+	bool debug, 
+	bool filter2D,
+	bool compensate)
 {
 	const float focal_y = height / (2.0f * tan_fovy);
 	const float focal_x = width / (2.0f * tan_fovx);
@@ -246,34 +251,37 @@ int CudaRasterizer::Rasterizer::forward(
 	}
 
 	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
-	CHECK_CUDA(FORWARD::preprocess(
-		P, D, M,
-		means3D,
-		(glm::vec3*)scales,
-		scale_modifier,
-		(glm::vec4*)rotations,
-		opacities,
-		shs,
-		geomState.clamped,
-		cov3D_precomp,
-		colors_precomp,
-		viewmatrix, projmatrix,
-		(glm::vec3*)cam_pos,
-		width, height,
-		focal_x, focal_y,
-		tan_fovx, tan_fovy,
-		radii,
-		geomState.means2D,
-		geomState.depths,
-		geomState.cov3D,
-		geomState.rgb,
-		geomState.conic_opacity,
-		tile_grid,
-		geomState.tiles_touched,
-		prefiltered
-	), debug)
+    CHECK_CUDA(FORWARD::preprocess(
+                   P, D, M,
+                   means3D,
+                   (glm::vec3 *)scales,
+                   scale_modifier,
+                   (glm::vec4 *)rotations,
+                   opacities,
+                   shs,
+                   geomState.clamped,
+                   cov3D_precomp,
+                   colors_precomp,
+                   viewmatrix, projmatrix,
+                   (glm::vec3 *)cam_pos,
+                   width, height,
+                   focal_x, focal_y,
+                   tan_fovx, tan_fovy,
+                   radii, radii_min,
+                   radiiBeforeFilter, radii_minBeforeFilter,
+                   geomState.means2D,
+                   geomState.depths,
+                   geomState.cov3D,
+                   geomState.rgb,
+                   geomState.conic_opacity,
+                   geomState.cov2D,
+                   geomState.cov2D_wofilter,
+                   tile_grid,
+                   geomState.tiles_touched,
+                   prefiltered, filter2D, compensate),
+               debug)
 
-	// Compute prefix sum over full list of touched tile counts by Gaussians // [Yutong] offset
+    // Compute prefix sum over full list of touched tile counts by Gaussians // [Yutong] offset
 	// E.g., [2, 3, 0, 2, 1] -> [2, 5, 5, 7, 8]
 	CHECK_CUDA(cub::DeviceScan::InclusiveSum(geomState.scanning_space, geomState.scan_size, geomState.tiles_touched, geomState.point_offsets, P), debug)
 
@@ -295,7 +303,7 @@ int CudaRasterizer::Rasterizer::forward(
 		geomState.point_offsets,
 		binningState.point_list_keys_unsorted, //[Yutong] [Tileid|depth]
 		binningState.point_list_unsorted, // [Yutong] Value is the gaussian ID, so binning is the group of duplicated Gaussians
-		radii,
+		radii, 
 		tile_grid)
 	CHECK_CUDA(, debug)
 
@@ -329,10 +337,13 @@ int CudaRasterizer::Rasterizer::forward(
 		geomState.means2D,
 		feature_ptr,
 		geomState.conic_opacity,
+        geomState.depths,
+        geomState.cov2D,
+        geomState.cov2D_wofilter,
 		imgState.accum_alpha,
 		imgState.n_contrib,
 		background,
-		out_color), debug)
+		out_color, out_num_gs, out_gss), debug)
 
 	return num_rendered;
 }
@@ -368,7 +379,8 @@ void CudaRasterizer::Rasterizer::backward(
 	float* dL_dsh,
 	float* dL_dscale,
 	float* dL_drot,
-	bool debug)
+	bool debug,
+	bool filter2D)
 {
 	GeometryState geomState = GeometryState::fromChunk(geom_buffer, P);
 	BinningState binningState = BinningState::fromChunk(binning_buffer, R);
@@ -432,5 +444,6 @@ void CudaRasterizer::Rasterizer::backward(
 		dL_dcov3D,
 		dL_dsh,
 		(glm::vec3*)dL_dscale,
-		(glm::vec4*)dL_drot), debug)
+		(glm::vec4*)dL_drot,
+		filter2D), debug)
 }

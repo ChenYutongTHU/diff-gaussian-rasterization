@@ -37,15 +37,20 @@ namespace FORWARD
 		const int W, int H,
 		const float focal_x, float focal_y,
 		const float tan_fovx, float tan_fovy,
-		int* radii,
+		int* radii, int* radii_min,
+		int* radiiBeforeFilter, int* radii_minBeforeFilter,
 		float2* points_xy_image,
 		float* depths,
 		float* cov3Ds,
 		float* colors,
 		float4* conic_opacity,
+        float3* cov2D,
+        float3* cov2D_wofilter,
 		const dim3 grid,
 		uint32_t* tiles_touched,
-		bool prefiltered);
+		bool prefiltered,
+		bool filter2D,
+		bool compensate);
 
 	// Main rasterization method.
 	void render(
@@ -56,10 +61,13 @@ namespace FORWARD
 		const float2* points_xy_image,
 		const float* features,
 		const float4* conic_opacity,
+        const float* depths,
+        const float3* cov2D,
+        const float3* cov2D_wofilter,
 		float* final_T,
 		uint32_t* n_contrib,
 		const float* bg_color,
-		float* out_color);
+		float* out_color, int* out_num_gs, float* out_gss);
 }
 
 

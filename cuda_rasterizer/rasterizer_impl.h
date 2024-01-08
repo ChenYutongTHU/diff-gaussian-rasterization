@@ -39,9 +39,10 @@ namespace CudaRasterizer
 		float* rgb;
 		uint32_t* point_offsets;
 		uint32_t* tiles_touched;
-
-		static GeometryState fromChunk(char*& chunk, size_t P);
-	};
+        float3* cov2D;
+        float3* cov2D_wofilter;
+        static GeometryState fromChunk(char*& chunk, size_t P);
+    };
 
 	struct ImageState // Each pixel has an ImageState
 	{

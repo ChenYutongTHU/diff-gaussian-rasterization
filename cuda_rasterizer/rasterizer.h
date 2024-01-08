@@ -48,9 +48,14 @@ namespace CudaRasterizer
 			const float* cam_pos,
 			const float tan_fovx, float tan_fovy,
 			const bool prefiltered,
-			float* out_color,
-			int* radii = nullptr,
-			bool debug = false);
+			float* out_color, int* out_num_gs, float* out_gss,
+			int* radii = nullptr, 
+            int* radii_min = nullptr,
+			int* radiiBeforeFilter = nullptr,
+			int* radii_minBeforeFilter = nullptr,
+			bool debug = false,
+			bool filter2D = true,
+			bool compensate = false);
 
 		static void backward(
 			const int P, int D, int M, int R,
@@ -81,7 +86,8 @@ namespace CudaRasterizer
 			float* dL_dsh,
 			float* dL_dscale,
 			float* dL_drot,
-			bool debug);
+			bool debug,
+			bool filter2D);
 	};
 };
 
