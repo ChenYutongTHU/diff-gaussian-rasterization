@@ -334,7 +334,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	// if (compensate)
 	// 	conic_opacity[idx] = { conic.x, conic.y, conic.z, opacities[idx] * coef };
 	// else
-	// 	conic_opacity[idx] = { conic.x, conic.y, conic.z, opacities[idx] };
+	conic_opacity[idx] = { conic.x, conic.y, conic.z, opacities[idx] };
     cov2D[idx] = cov;
     cov2D_wofilter[idx] = covBeforeFilter;
 	tiles_touched[idx] = (rect_max.y - rect_min.y) * (rect_max.x - rect_min.x);
